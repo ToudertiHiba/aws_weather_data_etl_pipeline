@@ -1,0 +1,82 @@
+- name: Install Cassandra on Ubuntu
+  hosts: cassandra_vm
+  remote_user: ubuntu
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install OpenJDK 8 and Wget
+      ansible.builtin.apt:
+        name:
+          - openjdk-8-jdk
+          - wget
+        state: present
+
+
+    - name: Set JAVA_HOME environment variable
+      ansible.builtin.lineinfile:
+        path: ~/.bashrc
+        line: 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64/'
+        create: yes
+
+    - name: Set PATH environment variable
+      ansible.builtin.lineinfile:
+        path: ~/.bashrc
+        line: 'export PATH=$PATH:$JAVA_HOME/bin'   
+        create: yes
+
+    - name: Download Cassandra
+      ansible.builtin.get_url:
+        url: https://dlcdn.apache.org/cassandra/4.1.4/apache-cassandra-4.1.4-bin.tar.gz
+        dest: ./cassandra.tgz
+
+    - name: Create cassandra directory
+      ansible.builtin.file:
+        path: ~/cassandra
+        state: directory
+
+    - name: Extract Cassandra
+      ansible.builtin.unarchive:
+        src: ~/cassandra.tgz
+        dest: ~/cassandra
+        remote_src: yes
+
+    - name: Add CASSANDRA_HOME to ~/.bashrc
+      ansible.builtin.lineinfile:
+        path: ~/.bashrc
+        line: 'export CASSANDRA_HOME=~/cassandra'
+        create: yes
+
+    - name: Add CASSANDRA_HOME/bin to PATH in ~/.bashrc
+      ansible.builtin.lineinfile:
+        path: ~/.bashrc
+        line: 'export PATH=$PATH:$CASSANDRA_HOME/bin'
+        create: yes
+  
+
+    - name: Set PYSPARK_PYTHON environment variable
+      ansible.builtin.lineinfile:
+        path: ~/.bashrc
+        line: 'export PYSPARK_PYTHON=python3'
+        create: yes
+
+    - name: Source .bashrc
+      ansible.builtin.shell: |
+        . ~/.bashrc
+
+    - name: Start Cassandra service
+      ansible.builtin.service:
+        name: cassandra
+        state: started
+
+    - name: Start CQL Shell
+      ansible.builtin.command: cqlsh
+      async: 10  # Run the command asynchronously
+
+    # - name: Start Cassandra
+    #   ansible.builtin.command:
+    #     cmd: apache-cassandra-4.1.4/bin/cassandra
+    #   async: 10  # Run the command asynchronously

@@ -1,0 +1,75 @@
+
+- name: Install Kafka on Ubuntu
+  hosts: kafka_vm
+  remote_user: ubuntu
+  become: true
+  vars:  
+    kafka_version: "3.7.0"
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+      become: yes
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - openjdk-8-jdk
+          - wget
+        state: present
+      become: yes
+
+    - name: Download and extract Kafka
+      shell: |
+        wget "https://downloads.apache.org/kafka/3.7.0/kafka_2.13-3.7.0.tgz" -O kafka.tgz
+        mkdir kafka
+        cd kafka
+        tar -xvzf ../kafka.tgz --strip 1
+
+    - name: Set KAFKA_HEAP_OPTS
+      ansible.builtin.set_fact:
+        KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+
+    - name: Install Python3 and kafka-python
+      ansible.builtin.package:
+        name:
+          - python3-pip
+          - python3-dev
+        state: present
+      become: yes
+
+    - name: Install kafka-python
+      ansible.builtin.pip:
+        name: kafka-python
+        state: present
+      become: yes
+
+    - name: Copy the Kafka Producer file
+      ansible.builtin.copy:
+        src: ./files/kafka_producer.py
+        dest: ./kafka_producer.py
+
+    - name: Copy the API Configuration File
+      ansible.builtin.copy:
+        src: ./files/api_config.json
+        dest: ./api_config.json
+
+    - name: Start Zookeeper
+      ansible.builtin.command:
+        cmd: /opt/kafka_2.13-3.7.0/bin/zookeeper-server-start.sh /opt/kafka_2.13-3.7.0/config/zookeeper.properties
+      become: yes
+      async: 10
+      poll: 0
+
+    - name: Start Kafka
+      ansible.builtin.command:
+        cmd: /opt/kafka_2.13-3.7.0/bin/kafka-server-start.sh /opt/kafka_2.13-3.7.0/config/server.properties
+      become: yes
+      async: 10
+      poll: 0
+
+    - name: Run Kafka producer
+      ansible.builtin.shell: |
+        python3 kafka_producer.py
+      become: yes

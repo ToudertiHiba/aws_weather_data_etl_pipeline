@@ -1,0 +1,14 @@
+files/access_keys.json
+files/api_config.json
+files/aws_ec2_rsa_key
+files/aws_ec2_rsa_key.pub
+
+poetry.lock
+
+.venv
+.git
+
+.terraform
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup

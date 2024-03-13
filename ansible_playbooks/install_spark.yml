@@ -1,0 +1,85 @@
+- name: Install Spark with Scala on Ubuntu
+  hosts: spark_vm
+  remote_user: ubuntu
+  become: true
+
+  tasks:
+    - name: Install OpenJDK 8 JDK
+      apt:
+        update_cache: yes
+        name: openjdk-8-jdk
+        state: present
+
+    - name: Install Spark dependencies
+      apt:
+        name: wget
+        state: present
+
+    - name: Download and extract Spark
+      shell: |
+        sudo wget "https://dlcdn.apache.org/spark/spark-3.5.1/spark-3.5.1.tgz" -O spark.tgz
+        mkdir spark
+        cd spark
+        tar -xvzf ../spark.tgz --strip 1
+
+    - name: Add environment variables to .bashrc
+      lineinfile:
+        path: ./.bashrc
+        state: present
+        line: "{{ item }}"
+      with_items:
+        - "export SPARK_HOME=~/spark"
+        - "export PATH=$PATH:$SPARK_HOME/bin"
+        - "export PYSPARK_PYTHON=python3"
+
+    - name: Install SBT dependencies
+      apt:
+        name: curl
+        state: present
+
+    - name: Download and extract SBT
+      shell: |
+        wget "https://github.com/sbt/sbt/releases/download/v1.9.2/sbt-1.9.2.tgz" -O sbt.tgz
+        mkdir sbt
+        cd sbt
+        tar -xvzf ../sbt.tgz --strip 1
+
+    - name: Add sbt environment variables to .bashrc
+      lineinfile:
+        path: ./.bashrc
+        state: present
+        line: "{{ item }}"
+      with_items:
+        - "export SBT_HOME=~/sbt"
+        - "export PATH=$PATH:$SBT_HOME/bin"
+
+    - name: Create StreamHandler directory
+      file:
+        path: "./StreamHandler"
+        state: directory
+
+    - name: Copy the build.sbt file
+      ansible.builtin.copy:
+        src: ./files/build.sbt
+        dest: ./StreamHandler
+
+    - name: Copy the stream_handler.scala file
+      ansible.builtin.copy:
+        src: ./files/StreamHandler.scala
+        dest: ./StreamHandler/
+
+    - name: Configure Spark log level
+      shell: |
+        cd ./spark/conf
+        sudo cp log4j2.properties.template log4j2.properties
+        sudo sed -i 's/INFO/WARN/g' log4j2.properties
+        sudo sed -i 's/info/warn/g' log4j2.properties
+
+    - name: Run Sbt Package
+      shell: |
+        sbt package
+
+    - name: Run Spark Submit
+      shell: |
+          spark-submit --class StreamHandler --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1,com.datastax.oss:java-driver-core:4.13.0,com.datastax.spark:spark-cassandra-connector_2.13:3.5.0 target/scala-2.13/streamhandler_2.13-1.0.jar
+

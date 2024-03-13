@@ -1,0 +1,51 @@
+---
+- name: Install and configure Streamlit app
+  hosts: streamlit_visualisation_vm
+  remote_user: ubuntu
+  become: true
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Python 3 pip
+      ansible.builtin.apt:
+        name: python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Install required Python packages
+      ansible.builtin.pip:
+        name:
+          - streamlit
+          - plotly
+          - pandas
+          - cassandra-driver
+
+    - name: Add ~/.local/bin to PATH
+      ansible.builtin.lineinfile:
+        path: ~/.bashrc
+        line: 'export PATH=$PATH:/home/ubuntu/.local/bin'
+        create: yes
+        insertafter: EOF
+
+    - name: Source ~/.bashrc
+      ansible.builtin.shell: |
+        . ~/.bashrc
+
+    - name: Copy the Streamlit Visualisation file
+      ansible.builtin.copy:
+        src: ./files/streamlit_visualisation.py
+        dest: ./streamlit_visualisation.py
+
+    - name: Get Cassandra VM IP address
+      ansible.builtin.add_host:
+        hostname: "{{ item }}"
+        groups: cassandra_vm_group
+      with_inventory_hostnames:
+        - cassandra_vm
+
+    - name: Run Streamlit app
+      ansible.builtin.shell: |
+        streamlit run ./streamlit_visualisation.py {{ hostvars[groups['cassandra_vm_group'][0]] }}
+      async: 10  # Run the command asynchronously
